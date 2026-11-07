@@ -134,24 +134,24 @@ bool tokenize(Arena *a, char **input, TokenArray *tokens) {
     return true;
 }
 
-int main() {
-    Arena a = {0};
+// int main() {
+//     Arena a = {0};
 
-    char* input = "{   \"key\":      \"v\\\"alue\"       }";
-    TokenArray tokens = {0};
+//     char* input = "{   \"key\":      \"v\\\"alue\"       }";
+//     TokenArray tokens = {0};
 
-    bool ok = tokenize(&a, &input, &tokens);
+//     bool ok = tokenize(&a, &input, &tokens);
      
-    if (!ok) {
-        printf("FAILED\n");
-        return 1;
-    }
+//     if (!ok) {
+//         printf("FAILED\n");
+//         return 1;
+//     }
 
-    for (size_t i = 0; i < tokens.count; i++) {
-        printf("Token: %d\n", tokens.items[i].type);
-    }
+//     for (size_t i = 0; i < tokens.count; i++) {
+//         printf("Token: %d\n", tokens.items[i].type);
+//     }
 
-    arena_free(&a);
+//     arena_free(&a);
 
-    return 0;
-}
+//     return 0;
+// }
