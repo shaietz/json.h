@@ -1,51 +1,6 @@
-#include "arena.h"
 #include "tokenizer.c"
 #include <stdio.h>
-
-typedef struct {
-    char *items;
-    size_t count;
-    size_t capacity;
-} String_Builder;
-
-typedef enum {
-    JSON_STRING,
-    JSON_NUMBER,
-    JSON_BOOL,
-    JSON_ARRAY,
-    JSON_OBJECT,
-    JSON_NULL,
-} JsonType;
-
-typedef struct JsonNode JsonNode;
-
-typedef struct JsonArray JsonArray;
-struct JsonArray {
-    JsonNode *items;
-    size_t count;
-    size_t capacity;
-};
-
-struct JsonNode {
-    JsonType type;
-    
-    union {
-        char *string;
-        double number;
-        bool boolean;
-
-        struct {
-            JsonNode *items;
-            size_t count;
-        } array;
-
-        struct {
-            char **keys;
-            JsonNode *values;
-            size_t count;
-        } object;
-    };
-};
+#include "json_node.c"
 
 void error(const char msg[]) {
     printf(msg);
@@ -54,111 +9,153 @@ void error(const char msg[]) {
 
 typedef struct Parser Parser;
 struct Parser {
+    Arena a;
     TokenArray tokens;
     size_t pos;
 };
 
-void consumeToken(Parser *p, JsonNode *node) {
-    Token t = p->tokens.items[p->pos];
-
-    switch (t.type) {
-        case T_STRING:
-            node->type = JSON_STRING;
-            node->string = t.string_val;
-        break;
-        case T_NUMBER:
-            node->type = JSON_NUMBER;
-            node->number = t.number_val;
-        break;
-        case T_TRUE:
-            node->type = JSON_BOOL;
-            node->boolean = true;
-        break;
-        case T_FALSE:
-            node->type = JSON_BOOL;
-            node->boolean = false;
-        break;
-        case T_NULL:
-            node->type = JSON_NULL;
-        break;
-        default:
-        break;
-    }
-
+void consumeToken(Parser *p) {
     p->pos++;
 }
 
-extern TokenType peekToken(Parser *p) {
-    return (p->tokens.items[p->pos]).type;
+extern Token peekToken(Parser *p) {
+    return (p->tokens.items[p->pos]);
 }
 
-bool accept(Parser *p, TokenType t, JsonNode *node) {
-    if (peekToken(p) == t) {
-        consumeToken(p, node);
+bool accept(Parser *p, TokenType t) {
+    if (peekToken(p).type == t) {
+        consumeToken(p);
         return true;
     }
     return false;
 }
 
-bool expect(Parser *p, TokenType t, JsonNode *node) {
-    if (accept(p, t, node)) {
+bool expect(Parser *p, TokenType t) {
+    if (accept(p, t)) {
         return true;
     }
     error("expect: unexpected symbol");
     return false;
 }
 
-void key(Parser *p, JsonNode *node) {
-    expect(p, T_STRING, node);
-    expect(p, T_COLON, node);
+bool parse_value(Parser *p, JsonNode *out); 
+
+bool parse_string(Parser *p, JsonString *out) {
+    char* string = peekToken(p).string_val;
+
+    if (!expect(p, T_STRING)) return false;
+
+    size_t length = strlen(string);
+    out->ptr = arena_alloc(&p->a, length);
+    memcpy(out->ptr, string, length);
+    out->len = length;
+
+    return true;
 }
 
-void value(Parser *p, JsonNode *node) {
-    if (accept(p, T_STRING, node) || accept(p, T_NUMBER, node) || accept(p, T_TRUE, node) || accept(p, T_FALSE, node) || accept(p, T_NULL, node)) {
-        return;
+bool parse_number(Parser *p, double *out) {
+    double val = peekToken(p).number_val;
+
+    if (!expect(p, T_NUMBER)) return false;
+    *out = val;
+    return true;
+}
+
+bool parse_bool(Parser *p, bool *out) {
+    TokenType t = peekToken(p).type;
+
+    if (!(accept(p, T_TRUE) || accept(p, T_FALSE))) return false;
+
+    *out = t == T_TRUE ? true : false;
+    return true;
+}
+
+bool parse_array(Parser *p, JsonArray *out) {
+    out->items = NULL;
+    out->count = out->capacity = 0;
+
+    if (!expect(p, T_LEFT_BRACKET)) return false;
+    if (accept(p, T_RIGHT_BRACKET)) return true;
+
+    do {
+        JsonNode n;
+        if (!parse_value(p, &n)) return false;
+        arena_da_append(&p->a, out, n);
+    } while (accept(p, T_COMMA));
+    
+    if (!expect(p, T_RIGHT_BRACKET)) return false;
+    return true;
+}
+
+bool parse_object(Parser *p, JsonNode *out) {
+    out->type = JSON_OBJECT;
+    out->object.items = NULL;
+    out->object.count = out->object.capacity = 0;
+
+    expect(p, T_LEFT_BRACE);
+    if (accept(p, T_RIGHT_BRACE)) return true;
+
+    do {
+        JsonMember m;
+        if (!parse_string(p, &m.key)) return false;
+        expect(p, T_COLON);
+        if (!parse_value(p, &m.value)) return false;
+
+        arena_da_append(&p->a, &out->object, m);
+
+    } while (accept(p, T_COMMA));
+
+    if (!expect(p, T_RIGHT_BRACE)) return false;
+    return true;
+}
+
+bool parse_value(Parser *p, JsonNode *out) {
+    TokenType t = peekToken(p).type;
+
+    switch (t) {
+        case T_LEFT_BRACE:
+            out->type = JSON_OBJECT;
+            if(!parse_object(p, out)) return false;
+        break;
+        case T_LEFT_BRACKET:
+            out->type = JSON_ARRAY;
+            if(!parse_array(p, &out->array)) return false;
+        break;
+        case T_STRING:
+            out->type = JSON_STRING;
+            if(!parse_string(p, &out->string)) return false;
+        break;
+        case T_NUMBER:
+            out->type = JSON_NUMBER;
+            if (!parse_number(p, &out->number)) return false;
+        break;
+        case T_TRUE:
+        case T_FALSE:
+            out->type = JSON_BOOl;
+            if (!parse_bool(p, &out->boolean)) return false;
+        break;
+        case T_NULL:
+            out->type = JSON_NULL;
+        break;
+        default:
+            printf("unknown symbol");
+            return false;
     }
 
-    if (accept(p, T_LEFT_BRACE, node)) {
-        do {
-            key(p, node);
-            value(p, node);
-        } while (accept(p, T_COMMA, node));
-        expect(p, T_RIGHT_BRACE, node);
-        return;
-    } else if (accept(p, T_LEFT_BRACKET, node)) {
-        do {
-            value(p, node);
-        } while (accept(p, T_COMMA, node));
-        expect(p, T_RIGHT_BRACKET, node);
-        return;
-    }
-
-    error("error: unexpected symbol");
+    return true;
 }
 
 int main() {
     Arena a = {0};
-    String_Builder root_keys = {0};
-    JsonArray root_values = {0};
-
-    JsonNode root = {
-        .type = JSON_OBJECT,
-        .object = {
-            .keys = &root_keys,
-            .values = &root_values,
-        }
-    };
-
-
-
     Parser p = {
+        .a = a,
         .pos = 0,
         .tokens = (TokenArray) {
             .items = (Token[5]){
                 { .type = T_LEFT_BRACE },
                 { .type = T_STRING, .string_val = "key" },
                 { .type = T_COLON, },
-                { .type = T_STRING, .string_val = "value" },
+                { .type = T_NUMBER, .number_val = 5 },
                 { .type = T_RIGHT_BRACE },
             },
             .capacity = 5,
@@ -166,5 +163,9 @@ int main() {
         }
     };
 
-    value(&p, &root);
+    JsonNode root = {0};
+
+    parse_value(&p, &root);
+
+    arena_free(&a);
 }

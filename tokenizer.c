@@ -35,39 +35,6 @@ struct TokenArray {
     size_t count;
 };
 
-// typedef struct Tokenizer Tokenizer;
-// struct Tokenizer {
-//     char *input;
-//     size_t position;
-//     size_t length;
-//     TokenArray *tokens;
-// };
-
-// bool tokenize_string(Tokenizer *t, Arena *a) {
-//     const char **input = &t->input;
-
-//     const char* start = *input;
-//     bool escape = false;
-
-//     while (!(!escape && **input == '"') && **input != '\0') {
-//         if (!escape && (**input) == '\\') {
-//             escape = true;
-//         } else {
-//             escape = false;
-//         }
-//         (*input)++;
-//     }
-
-//     size_t length = (size_t)(*input - start);
-//     char* result = arena_alloc(a, length + 1);
-//     memcpy(result, start, length);
-//     result[length] = '\0';
-
-//     if (**input == '"') (*input)++;
-
-//     return false;
-// }
-
 bool tokenize(Arena *a, char **input, TokenArray *tokens) {
     while (**input != '\0') {
         char c = (**input);
