@@ -249,3 +249,14 @@ bool jp_parse(Arena *a, const char *src, JsonNode *out, JsonError *err) {
     if (err) *err = (JsonError){.msg = p.errmsg, .pos = p.errpos};
     return false;
 }
+
+bool jp_has_key(JsonNode *node, const char *key) {
+    if (node->type != JSON_OBJECT) return false;
+
+    for (size_t i = 0; i < node->object.count; i++) {
+        JsonMember m = node->object.items[i];
+        if (strcmp(m.key.ptr, key) == 0) return true;
+    }
+
+    return false;
+}

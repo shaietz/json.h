@@ -28,6 +28,9 @@ int main() {
         fprintf(stderr, "parse error at byte %zu: %s\n", err.pos, err.msg);
     }
 
+    bool has_key = jp_has_key(&root, "active");
+    if (has_key) printf("the key was found!\n");
+
     arena_free(&a);
     return 0;
 }
