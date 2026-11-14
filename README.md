@@ -1,4 +1,5 @@
 # json.h
+![tests](https://github.com/shaietz/json.h/actions/workflows/test.yml/badge.svg)
 
 A small JSON parser and serializer for C11, built on
 [base.h](https://github.com/shaietz/base.h).
@@ -141,31 +142,9 @@ make suite-verbose    # same, listing what happened to each i_ case
 make CC=clang check   # use another compiler
 ```
 
-The unit tests (`tests/test.c`) check parsed values, serializer output, error
-positions and the API. JSONTestSuite checks only whether each file is accepted
-or rejected, across hundreds of edge cases. The two catch different bugs.
-
 JSONTestSuite is vendored in `tests/JSONTestSuite/`, pinned to the commit in
 its `SOURCE` file. To update it, change `SUITE_COMMIT` in the `Makefile`, run
 `make update-suite` and review the diff.
-
-GitHub Actions runs `make check` on every push and pull request, on Linux
-(gcc and clang) and macOS (clang).
-
-## Project layout
-
-```
-json.h                  the library
-base.h                  arenas, strings and arrays it builds on
-Makefile
-tests/
-  test.c                unit tests
-  json_suite.c          JSONTestSuite runner
-  run_suite.sh          runs the suite and checks results
-  JSONTestSuite/        vendored test cases (MIT, see its LICENSE)
-.github/workflows/
-  test.yml
-```
 
 ## License
 
