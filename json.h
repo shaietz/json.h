@@ -1,3 +1,110 @@
+// json.h - v0.1 - a small JSON parser and serializer for C11, on top of base.h
+// https://github.com/shaietz/json.h
+//
+// Licensed under MIT or public domain, at your choice; see the end of this file.
+//
+// Parses JSON into a tree allocated from an arena, and serializes it back.
+// Needs base.h (https://github.com/shaietz/base.h); link with -lm.
+// Passes all 318 cases of JSONTestSuite.
+//
+// ============================================================================
+// QUICK START
+// ============================================================================
+//
+//    #include "json.h"
+//
+//    int main(void) {
+//        Arena arena = arena_make(MB(64));
+//
+//        Str8 text = S8("{\"user\": {\"name\": \"shai\"}}");
+//        JsonNode root;
+//        JsonError err;
+//        if (!json_parse(&arena, text, &root, &err)) {
+//            printf("%td:%td: %s\n", err.line, err.col, err.msg);
+//            return 1;
+//        }
+//
+//        JsonNode *name = json_get(json_get(&root, S8("user")), S8("name"));
+//        if (name && name->type == JSON_STRING) {
+//            printf(STR8_FMT "\n", str8_varg(name->string));
+//        }
+//
+//        Str8 out = json_serialize(&arena, &root);
+//        printf(STR8_FMT "\n", str8_varg(out));
+//    }
+//
+// ============================================================================
+// DOCUMENTATION
+// ============================================================================
+//
+// PARSING
+//   json_parse(&a, src, &out, &err)
+//                            parse src into out, allocating from a. Returns 1
+//                            on success. On failure returns 0, fills err (if
+//                            not null) and gives back everything it allocated.
+//
+//   src is a Str8, so it need not be null-terminated. A NUL byte inside src
+//   is an error, not the end of input.
+//
+// LOOKUP
+//   json_get(obj, key)       object member by key, or null
+//   json_at(arr, i)          array element by index, or null
+//
+//   Both accept null and return null on a missing key, a bad index or the
+//   wrong node type, so lookups chain without checks in between:
+//       json_get(json_get(&root, S8("user")), S8("name"))
+//
+// SERIALIZING
+//   json_serialize(&a, node) compact JSON as one Str8 in the arena
+//
+// THE TREE
+//   JsonNode has a .type and a union:
+//     JSON_NULL
+//     JSON_BOOL      .boolean
+//     JSON_NUMBER    .number    f64
+//     JSON_STRING    .string    Str8, decoded
+//     JSON_ARRAY     .array     .data[i] is a JsonNode, .len of them
+//     JSON_OBJECT    .object    .data[i] is a JsonMember {key, value}
+//
+//   Iterating an object:
+//       for (isize i = 0; i < node->object.len; i++) {
+//           JsonMember *m = &node->object.data[i];
+//           ...use m->key and m->value...
+//       }
+//
+// ERRORS
+//   JsonError has .msg, plus .pos (byte offset), .line and .col (1-based).
+//
+// CONFIGURATION
+//   #define JSON_MAX_DEPTH n      before including; default 512. Deeper
+//                                 nesting is an error rather than a stack
+//                                 overflow.
+//
+// ============================================================================
+// NOTES AND GOTCHAS
+// ============================================================================
+//
+//   - Strings and keys are copied into the arena: the tree never points into
+//     src, so src can be freed after parsing.
+//   - Decoded strings can contain NUL bytes (from \u0000). Use .len.
+//   - Don't allocate from the arena while json_serialize runs; the output
+//     grows in place as the arena's newest allocation.
+//   - Duplicate keys are kept; json_get returns the first.
+//   - json_get is a linear scan. Fine for configs, slow for huge objects.
+//   - Numbers are parsed with strtod, which follows the C locale. Don't call
+//     setlocale with a locale that uses ',' as the decimal point.
+//   - Cases the spec leaves open:
+//       accepted   numbers out of double range (become inf or 0, and
+//                  serialize as null), lone surrogates (become U+FFFD),
+//                  invalid UTF-8 in strings (passed through)
+//       rejected   a leading byte-order mark, UTF-16 input
+//
+// ============================================================================
+// VERSION HISTORY
+// ============================================================================
+//
+//   0.1  (2026-11-14)  first public release
+//
 #ifndef JSON_H
 #define JSON_H
 
@@ -505,3 +612,45 @@ internal Str8 json_serialize(Arena *a, JsonNode *node) {
 }
 
 #endif // JSON_H
+
+/*
+------------------------------------------------------------------------------
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2026 Shai Etzion
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
+*/
