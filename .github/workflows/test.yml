@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / ${{ matrix.cc }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false   # one compiler failing shouldn't hide the others' results
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+          - os: ubuntu-latest
+            cc: clang
+          - os: macos-latest
+            cc: clang
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compiler version
+        run: ${{ matrix.cc }} --version
+
+      # Unit tests (sanitized and -O2) plus JSONTestSuite, which is vendored
+      # in tests/JSONTestSuite, so no network access is needed here.
+      - name: make check
+        run: make CC=${{ matrix.cc }} check
