@@ -19,7 +19,7 @@ SUITE_REPO   = https://github.com/nst/JSONTestSuite
 SUITE_COMMIT = 1ef36fa01286573e846ac449e8683f8833c5b26a
 SUITE_DIR    = tests/JSONTestSuite
 
-.PHONY: all test test-release suite suite-verbose check update-suite clean help
+.PHONY: all test test-release suite suite-verbose example check update-suite clean help
 
 all: $(BUILD)/test $(BUILD)/json_suite
 
@@ -53,7 +53,13 @@ suite: $(BUILD)/json_suite
 suite-verbose: $(BUILD)/json_suite
 	@sh tests/run_suite.sh ./$(BUILD)/json_suite $(SUITE_DIR) -v
 
-check: test test-release suite
+$(BUILD)/example: examples/main.c $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) $(SAN) $< -o $@ $(LDLIBS)
+
+example: $(BUILD)/example
+	./$(BUILD)/example
+
+check: test test-release suite example
 
 # --- maintenance ------------------------------------------------------------
 
